@@ -3,6 +3,10 @@ import subprocess
 import time
 import threading
 import re
+import AppKit
+
+# MacのDock（下のバー）にPythonのアイコンを出さないようにする魔法のおまじない
+AppKit.NSApplication.sharedApplication().setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
 
 class MyCatApp(rumps.App):
     def __init__(self):
