@@ -8,12 +8,13 @@ import AppKit
 # MacのDock（下のバー）にPythonのアイコンを出さないようにする魔法のおまじない
 AppKit.NSApplication.sharedApplication().setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
 
-class MyCatApp(rumps.App):
+class PingMonitor(rumps.App):
     def __init__(self):
-        super(MyCatApp, self).__init__("🐈")
+        super(PingMonitor, self).__init__("")
         
         # 🟢 アニメーション用
-        self.frames = ["⚪️"]
+        self.frames = ["sleep.PNG"]
+        self.icon = self.frames[0]
         self.current_frame = 0
         
         # 📡 Ping値（初期値は0）
@@ -58,30 +59,31 @@ class MyCatApp(rumps.App):
         
         # Ping値に応じてアイコンと速度を切り替え
         if ping == 0.0:
-            self.frames = ["⚪️"]
+            self.frames = ["sleep.PNG"]
             timer.interval = 1.0
         elif ping < 20.0:
             # 【超速い/快適】 🟢 ＋ ダッシュ (< 20ms)
-            self.frames = ["🚀"]
+            self.frames = ["fly-1.PNG"]
             timer.interval = 0.04
         elif ping < 60.0:
             # 【普通】 🔵 ＋ 普通に走る (< 60ms)
-            self.frames = ["🐎"]
+            self.frames = ["fly-1.PNG"]
             timer.interval = 0.15
         elif ping < 150.0:
             # 【ちょっと遅い/ラグい】 🟡 ＋ トコトコ (< 150ms)
-            self.frames = ["🐢"]
+            self.frames = ["kyurun-1.PNG", "kyurun-2.PNG","kyurun-1.PNG","kyurun-1.PNG"]
             timer.interval = 0.4
         else:
             # 【遅い・不通】 🔴 ＋ ピコンピコン (エラー・切断)
-            self.frames = ["‼️"]
+            self.frames = ["sleep.PNG"]
             timer.interval = 1.0
 
         # パラパラ漫画の次のコマへ
         self.current_frame = (self.current_frame + 1) % len(self.frames)
         
-        # 数値は消して、アニメーションアイコンのみをメニューバーに表示
-        self.title = self.frames[self.current_frame]
+        # 数値・テキストは消して、画像アイコンのみをメニューバーに表示
+        self.title = ""
+        self.icon = self.frames[self.current_frame]
 
     # ポップアップでPing値を表示する機能に変更
     @rumps.clicked("現在の応答速度 (Ping) を確認")
@@ -95,15 +97,15 @@ class MyCatApp(rumps.App):
         else:
             # 速度に応じたメッセージ
             if ping < 20.0:
-                comment = "爆速です！🔥🚀"
+                comment = "🦅爆速です！🦅"
             elif ping < 60.0:
-                comment = "普通です。通信問題なしです🐳✨"
+                comment = "普通です。通信問題なしです🕊️"
             elif ping < 150.0:
-                comment = "少しラグがあるかもしれません🐢"
+                comment = "少しラグがある🦆しれません"
             else:
-                comment = "かなり遅いかもしれません...🐌"
+                comment = "かなり遅いかもしれません...🐣"
                 
             rumps.alert("現在のPing値", f"【 {ping:.1f} ms 】\n\n{comment}")
 
 if __name__ == "__main__":
-    MyCatApp().run()
+    PingMonitor().run()
