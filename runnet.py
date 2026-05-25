@@ -62,7 +62,7 @@ class MyCatApp(rumps.App):
             timer.interval = 0.04
         elif ping < 60.0:
             # 【普通】 🔵 ＋ 普通に走る (< 60ms)
-            self.frames = ["🐇"]
+            self.frames = ["🐎"]
             timer.interval = 0.15
         elif ping < 150.0:
             # 【ちょっと遅い/ラグい】 🟡 ＋ トコトコ (< 150ms)
@@ -70,7 +70,7 @@ class MyCatApp(rumps.App):
             timer.interval = 0.4
         else:
             # 【遅い・不通】 🔴 ＋ ピコンピコン (エラー・切断)
-            self.frames = ["🔴", "", "🔴", "🔴"]
+            self.frames = ["‼️"]
             timer.interval = 1.0
 
         # パラパラ漫画の次のコマへ
