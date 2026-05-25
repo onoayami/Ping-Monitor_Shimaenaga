@@ -1,74 +1,105 @@
 import rumps
 import subprocess
-import psutil
 import time
+import threading
+import re
 
 class MyCatApp(rumps.App):
     def __init__(self):
-        super(MyCatApp, self).__init__("🍥")
+        super(MyCatApp, self).__init__("🐈")
         
-        # 🟢 最初は「普通・安定（緑）」のコマでスタート
-        self.frames = ["🟢"]
+        # 🟢 アニメーション用
+        self.frames = ["⚪️"]
         self.current_frame = 0
         
-        # ⏱ 速度計算用の記録
-        self.last_io = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
-        self.last_time = time.time()
+        # 📡 Ping値（初期値は0）
+        self.current_ping_ms = 0.0
         
-        self.timer = rumps.Timer(self.animate, 0.3)
+        # バックグラウンドでPingを測り続ける「裏方」を開始
+        self.ping_thread = threading.Thread(target=self.ping_loop, daemon=True)
+        self.ping_thread.start()
+        
+        # アイコンを更新するタイマー
+        self.timer = rumps.Timer(self.animate, 1.0)
         self.timer.start()
 
-    def animate(self, timer):
-        # 1. 現在の「通信量」と「今の時間」を取得
-        current_io = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
-        current_time = time.time()
-        
-        # 2. 経過時間の計算
-        elapsed = current_time - self.last_time
-        if elapsed <= 0:
-            elapsed = 0.01
+    def ping_loop(self):
+        # 裏方係の仕事：ずっとPingを打ち続けて、最新のmsを記録する
+        while True:
+            try:
+                # 1.1.1.1 にPingを1回送る（最大2秒まで待つ）
+                result = subprocess.run(
+                    ["ping", "-c", "1", "1.1.1.1"],
+                    capture_output=True, text=True, timeout=2.0
+                )
+                if result.returncode == 0:
+                    # 結果の文字から "time=〇〇 ms" の数値を抜き出す
+                    match = re.search(r'time=([\d\.]+)\s*ms', result.stdout)
+                    if match:
+                        self.current_ping_ms = float(match.group(1))
+                    else:
+                        self.current_ping_ms = 9999.0
+                else:
+                    self.current_ping_ms = 9999.0
+            except Exception:
+                # オフラインなどでエラーになった時
+                self.current_ping_ms = 9999.0
             
-        # 3. 1秒あたり何MB（メガバイト）通信したかを計算
-        bytes_diff = current_io - self.last_io
-        speed_mb = (bytes_diff / elapsed) / 1024 / 1024
+            # 2秒おきにもう一度Pingを打つ
+            time.sleep(2)
+
+    def animate(self, timer):
+        # 現在記録されているPing値を取得
+        ping = self.current_ping_ms
         
-        self.last_io = current_io
-        self.last_time = current_time
-        
-        # 4. 速度（speed_mb）に応じて、走る速さと「色丸」を変化させる！
-        if speed_mb < 0.05:
-            # 【ほぼ通信なし・超低速】 🔴赤丸 ＋ 1.0秒に1コマ（まったり）
-            self.frames = ["🐢"]
+        # Ping値に応じてアイコンと速度を切り替え
+        if ping == 0.0:
+            self.frames = ["⚪️"]
             timer.interval = 1.0
-        elif speed_mb < 0.5:
-            # 【軽い通信・低速】 🟡黄丸 ＋ 0.4秒に1コマ（トコトコ）
-            self.frames = ["🐇"]
-            timer.interval = 0.4
-        elif speed_mb < 2.0:
-            # 【中くらいの通信・中速】 🔵青丸 ＋ 0.15秒に1コマ（そこそこ速い）
-            self.frames = ["🚗"]
-            timer.interval = 0.15
-        else:
-            # 【激しい通信・高速】 🟢緑丸 ＋ 0.04秒に1コマ（猛ダッシュ！！！）
+        elif ping < 20.0:
+            # 【超速い/快適】 🟢 ＋ ダッシュ (< 20ms)
             self.frames = ["🚀"]
             timer.interval = 0.04
+        elif ping < 60.0:
+            # 【普通】 🔵 ＋ 普通に走る (< 60ms)
+            self.frames = ["🐇"]
+            timer.interval = 0.15
+        elif ping < 150.0:
+            # 【ちょっと遅い/ラグい】 🟡 ＋ トコトコ (< 150ms)
+            self.frames = ["🐢"]
+            timer.interval = 0.4
+        else:
+            # 【遅い・不通】 🔴 ＋ ピコンピコン (エラー・切断)
+            self.frames = ["🔴", "", "🔴", "🔴"]
+            timer.interval = 1.0
 
-        # 5. パラパラ漫画を表示
+        # パラパラ漫画の次のコマへ
         self.current_frame = (self.current_frame + 1) % len(self.frames)
+        
+        # 数値は消して、アニメーションアイコンのみをメニューバーに表示
         self.title = self.frames[self.current_frame]
 
-    # 回線チェック機能（そのまま）
-    @rumps.clicked("回線チェック (Ping)")
-    def check_ping(self, _):
-        rumps.alert("確認中...", "Pingを打っています。少しお待ちください。")
-        try:
-            result = subprocess.run(["ping", "-c", "1", "1.1.1.1"], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                rumps.alert("結果：大成功！", "無事にインターネットに繋がっています！")
+    # ポップアップでPing値を表示する機能に変更
+    @rumps.clicked("現在の応答速度 (Ping) を確認")
+    def show_ping(self, _):
+        ping = self.current_ping_ms
+        
+        if ping == 0.0:
+            rumps.alert("確認中...", "Pingの測定を準備中です。少し待ってから再度お試しください。")
+        elif ping >= 9999.0:
+            rumps.alert("接続エラー", "インターネット回線が切断されているか、応答がありません。")
+        else:
+            # 速度に応じたメッセージ
+            if ping < 20.0:
+                comment = "爆速です！🔥🚀"
+            elif ping < 60.0:
+                comment = "普通です。通信問題なしです🐳✨"
+            elif ping < 150.0:
+                comment = "少しラグがあるかもしれません🐢"
             else:
-                rumps.alert("結果：失敗...", "回線が途切れているかもしれません。")
-        except Exception as e:
-            rumps.alert("エラー", "何かがおかしいようです。")
+                comment = "かなり遅いかもしれません...🐌"
+                
+            rumps.alert("現在のPing値", f"【 {ping:.1f} ms 】\n\n{comment}")
 
 if __name__ == "__main__":
     MyCatApp().run()
