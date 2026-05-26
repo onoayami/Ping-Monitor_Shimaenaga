@@ -13,7 +13,7 @@ class PingMonitor(rumps.App):
         super(PingMonitor, self).__init__("")
         
         # 🟢 アニメーション用
-        self.frames = ["fly-1.PNG"]
+        self.frames = ["fly1.PNG"]
         self.icon = self.frames[0]
         self.current_frame = 0
         
@@ -59,27 +59,33 @@ class PingMonitor(rumps.App):
         
         # Ping値に応じてアイコンと速度を切り替え
         if ping == 0.0:
-            self.frames = ["sleepy-1.PNG"]
-            timer.interval = 1.0
+            frames = ["kyurun-1.PNG"]
+            new_interval = 1.0
         elif ping < 20.0:
-            # 【超速い/快適】 🟢 ＋ ダッシュ (< 20ms)
-            self.frames = ["fly-1.PNG"]
-            timer.interval = 0.04
+            # 【超速い/快適】 🟢 ＋ パッタパった (< 20ms)
+            frames = ["fly1.PNG","fly2.PNG","fly3.PNG","fly4.PNG","fly5.PNG","fly4-2.PNG","fly3.PNG","fly2.PNG"]
+            new_interval = 0.04
         elif ping < 60.0:
-            # 【普通】 🔵 ＋ 普通に走る (< 60ms)
-            self.frames = ["fly-1.PNG"]
-            timer.interval = 0.15
+            # 【普通】 🔵 ＋ 普通にパタパタ (< 60ms)
+            frames = ["fly1.PNG","fly2.PNG","fly3.PNG","fly4.PNG","fly5.PNG","fly4-2.PNG","fly3.PNG","fly2.PNG"]
+            new_interval = 0.14
         elif ping < 150.0:
-            # 【ちょっと遅い/ラグい】 🟡 ＋ トコトコ (< 150ms)
-            self.frames = ["kyurun-1.PNG", "kyurun-2.PNG","kyurun-2.PNG","kyurun-1.PNG","kyurun-1.PNG"]
-            timer.interval = 0.4
+            # 【ちょっと遅い/ラグい】 🟡 ＋ きゅるん (< 150ms)
+            frames = ["kyurun-1.PNG", "kyurun-2.PNG","kyurun-2.PNG","kyurun-2.PNG","kyurun-1.PNG","kyurun-1.PNG","kyurun-1.PNG"]
+            new_interval = 0.4
         else:
-            # 【遅い・不通】 🔴 ＋ ピコンピコン (エラー・切断)
-            self.frames = ["sleepy-1.PNG", "sleepy-2.PNG", "sleepy-3.PNG", "sleepy-4.PNG"]
-            timer.interval = 1.0
+            # 【遅い・不通】 🔴 ＋ おねむ (エラー・切断)
+            frames = ["sleepy-1.PNG", "sleepy-2.PNG", "sleepy-3.PNG", "sleepy-4.PNG"]
+            new_interval = 1.0
 
-        # パラパラ漫画の次のコマへ
-        self.current_frame = (self.current_frame + 1) % len(self.frames)
+        # アニメーションの内容や速度が変わったときだけ更新する
+        if timer.interval != new_interval or self.frames != frames:
+            self.frames = frames
+            timer.interval = new_interval
+            self.current_frame = 0 # 状態が変わったら最初のコマからリセット
+        else:
+            # パラパラ漫画の次のコマへ
+            self.current_frame = (self.current_frame + 1) % len(self.frames)
         
         # 数値・テキストは消して、画像アイコンのみをメニューバーに表示
         self.title = ""
@@ -97,7 +103,7 @@ class PingMonitor(rumps.App):
         else:
             # 速度に応じたメッセージ
             if ping < 20.0:
-                comment = "🦅爆速です！🦅"
+                comment = "🦅 爆速です 🦅"
             elif ping < 60.0:
                 comment = "普通です。通信問題なしです🕊️"
             elif ping < 150.0:
