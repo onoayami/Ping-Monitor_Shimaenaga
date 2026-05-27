@@ -55,8 +55,8 @@ class PingMonitor(rumps.App):
                 # オフラインなどでエラーになった時
                 self.current_ping_ms = 9999.0
             
-            # 2秒おきにもう一度Pingを打つ
-            time.sleep(2)
+            # Pingを打つ間隔を長くしてCPU負荷を下げる (10秒)
+            time.sleep(10)
 
     def animate(self, timer):
         # 現在記録されているPing値を取得
@@ -69,19 +69,19 @@ class PingMonitor(rumps.App):
         elif ping < 20.0:
             # 【超速い/快適】 🟢 ＋ パッタパった (< 20ms)
             frames = ["fly1.PNG","fly2.PNG","fly3.PNG","fly4.PNG","fly5.PNG","fly4-2.PNG","fly3.PNG","fly2.PNG"]
-            new_interval = 0.1  # 元の0.04から遅くして負荷軽減
+            new_interval = 0.1
         elif ping < 60.0:
             # 【普通】 🔵 ＋ 普通にパタパタ (< 60ms)
             frames = ["fly1.PNG","fly2.PNG","fly3.PNG","fly4.PNG","fly5.PNG","fly4-2.PNG","fly3.PNG","fly2.PNG"]
-            new_interval = 0.3  # 元の0.14から少し遅くして負荷軽減
+            new_interval = 0.5
         elif ping < 150.0:
             # 【ちょっと遅い/ラグい】 🟡 ＋ きゅるん (< 150ms)
             frames = ["kyurun-1.PNG", "kyurun-2.PNG","kyurun-2.PNG","kyurun-2.PNG","kyurun-1.PNG","kyurun-1.PNG","kyurun-1.PNG"]
-            new_interval = 0.5  # 0.4 -> 0.5
+            new_interval = 0.5
         else:
             # 【遅い・不通】 🔴 ＋ おねむ (エラー・切断)
             frames = ["sleepy-1.PNG", "sleepy-2.PNG", "sleepy-3.PNG", "sleepy-4.PNG"]
-            new_interval = 0.5  # 0.4 -> 0.5
+            new_interval = 0.5
 
         # アニメーションの内容や速度が変わったときだけ更新する
         if timer.interval != new_interval or self.frames != frames:
