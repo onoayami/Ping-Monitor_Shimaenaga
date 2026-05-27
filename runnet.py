@@ -73,7 +73,7 @@ class PingMonitor(rumps.App):
         elif ping < 60.0:
             # 【普通】 🔵 ＋ 普通にパタパタ (< 60ms)
             frames = ["fly1.PNG","fly2.PNG","fly3.PNG","fly4.PNG","fly5.PNG","fly4-2.PNG","fly3.PNG","fly2.PNG"]
-            new_interval = 0.2  # 元の0.14から少し遅くして負荷軽減
+            new_interval = 0.3  # 元の0.14から少し遅くして負荷軽減
         elif ping < 150.0:
             # 【ちょっと遅い/ラグい】 🟡 ＋ きゅるん (< 150ms)
             frames = ["kyurun-1.PNG", "kyurun-2.PNG","kyurun-2.PNG","kyurun-2.PNG","kyurun-1.PNG","kyurun-1.PNG","kyurun-1.PNG"]
@@ -127,54 +127,56 @@ class PingMonitor(rumps.App):
     def random_kyurun(self, _):
         # 画像ファイル名をランダムで選ぶ
         image_file = random.choice(["kyurun-1.PNG", "kyurun-2.PNG"])
-        image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), image_file)
         
-        # MacネイティブのUI（AppKit）を使って「DEBUG」の出ない専用ウィンドウを作ります！
-        # タイトルも自由に設定でき、不要なファイルコピーの裏技も不要になります
-        mac_ui_code = f'''
-import AppKit
+        # アプリとして書き出した（py2app）時と、通常実行した時の画像パスの違いを吸収します！
+        if 'RESOURCEPATH' in os.environ:
+            image_path = os.path.join(os.environ['RESOURCEPATH'], image_file)
+        else:
+            image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), image_file)
 
-class AppDelegate(AppKit.NSObject):
-    def applicationDidFinishLaunching_(self, notification):
-        image = AppKit.NSImage.alloc().initWithContentsOfFile_(r"{image_path}")
+        # 【追加】すでにウィンドウが開いていたら安全に閉じておく
+        if getattr(self, 'kyurun_window', None) is not None:
+            try:
+                self.kyurun_window.close()
+            except Exception:
+                pass
+        
+        # アプリ化すると別のPythonプロセスを起動(subprocess.Popen)する裏技がブロックされてしまうため、
+        # 今動いているシステム（rumps）内で直接ウィンドウを作って表示するように書き直します！
+        
+        image = AppKit.NSImage.alloc().initWithContentsOfFile_(image_path)
         if not image:
-            AppKit.NSApp.terminate_(None)
+            rumps.alert("エラー", f"画像が見つかりません...泣\n{image_path}")
             return
 
         size = image.size()
-        # 1: Titled (タイトルバーあり), 2: Closable (閉じるボタンあり)
-        mask = 1 | 2
-        self.window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+        mask = 1 | 2 # 1: Titled (タイトルバーあり), 2: Closable (閉じるボタンあり)
+        
+        # RuntimeErrorを防ぐため、self.kyurun_windowとしてウィンドウの情報をアプリ側に持たせます
+        self.kyurun_window = AppKit.NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
             AppKit.NSMakeRect(0, 0, size.width, size.height), mask, 2, False
         )
-        self.window.setTitle_("きゅるん")
-        self.window.center()
-        self.window.setLevel_(3) # 常に最前面
+        self.kyurun_window.setTitle_("きゅるん")
+        self.kyurun_window.center()
+        self.kyurun_window.setLevel_(3) # 常に最前面
+
+        # 【重要】ウィンドウが閉じられた時にメモリから自動削除されないようにする（これでクラッシュを完全に防ぎます！）
+        self.kyurun_window.setReleasedWhenClosed_(False)
         
-        # ウィンドウの背景を指定のカラー (#F2E2FF) にする
-        # R=242, G=226, B=255 なので、それぞれを 255 で割って 0.0〜1.0 の値にします
+        # ウィンドウの背景を指定のこだわりのカラー (#F2E2FF) にする
         bg_color = AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(242/255.0, 226/255.0, 255/255.0, 1.0)
-        self.window.setBackgroundColor_(bg_color)
+        self.kyurun_window.setBackgroundColor_(bg_color)
         
-        # 画像を表示して、クリックされたら閉じる処理をセット
-        view = ClickableView.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, size.width, size.height))
-        view.setImage_(image)
-        self.window.setContentView_(view)
+        # ここが裏技：画像をクリックしたら閉じる設定を、ボタンとして割り当てます
+        btn = AppKit.NSButton.alloc().initWithFrame_(AppKit.NSMakeRect(0, 0, size.width, size.height))
+        btn.setImage_(image)
+        btn.setBordered_(False) # ボタンの線や影を消して画像と一体化
+        btn.setAction_(AppKit.NSSelectorFromString("close")) # performClose ではなく直接 close を呼ぶのが安全！
+        btn.setTarget_(self.kyurun_window)
         
-        self.window.makeKeyAndOrderFront_(None)
+        self.kyurun_window.setContentView_(btn)
+        self.kyurun_window.makeKeyAndOrderFront_(None)
         AppKit.NSApp.activateIgnoringOtherApps_(True)
-
-class ClickableView(AppKit.NSImageView):
-    def mouseDown_(self, event):
-        AppKit.NSApp.terminate_(None) # クリックで閉じる
-
-app = AppKit.NSApplication.sharedApplication()
-app.setActivationPolicy_(1) # Dockアイコンを出さない
-delegate = AppDelegate.alloc().init()
-app.setDelegate_(delegate)
-app.run()
-'''
-        subprocess.Popen([sys.executable, "-c", mac_ui_code])
 
 if __name__ == "__main__":
     PingMonitor().run()
